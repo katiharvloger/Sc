@@ -2,31 +2,42 @@
 <html lang="hi">
 <head>
     <meta charset="UTF-8">
-    <title>Superior Classes - Smart Receipt</title>
+    <title>Superior Classes - Smart Receipt & Database</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 20px; margin: 0; }
         
-        /* User Panel (Mobile Friendly) */
-        .no-print { max-width: 900px; margin: 0 auto 20px auto; background: #fff; padding: 20px; border-radius: 8px; border: 1px solid #ddd; display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-        .input-group { display: flex; flex-direction: column; font-size: 13px; font-weight: bold; color: #333; }
-        input { padding: 10px; border: 1px solid #ccc; border-radius: 4px; margin-top: 4px; outline: none; font-size: 14px; }
-        input:focus { border-color: #1a237e; }
+        /* User Panels */
+        .panel { max-width: 900px; margin: 0 auto 20px auto; background: #fff; padding: 20px; border-radius: 8px; border: 1px solid #ddd; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        .grid-panel { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
         
-        .btn-group { grid-column: span 3; display: flex; gap: 15px; margin-top: 10px; }
-        .btn-download { flex: 1; background: #1a237e; color: white; border: none; padding: 15px; cursor: pointer; font-weight: bold; border-radius: 4px; font-size: 16px; transition: 0.3s; }
-        .btn-download:hover { background: #12185b; }
-        .btn-next { flex: 1; background: #2e7d32; color: white; border: none; padding: 15px; cursor: pointer; font-weight: bold; border-radius: 4px; font-size: 16px; }
+        .db-panel { background: #e3f2fd; border: 1px solid #90caf9; }
+        .db-header { grid-column: span 3; color: #1565c0; margin-top: 0; margin-bottom: 5px; font-size: 18px; border-bottom: 2px solid #90caf9; padding-bottom: 5px; }
+        
+        .input-group { display: flex; flex-direction: column; font-size: 13px; font-weight: bold; color: #333; }
+        input, select { padding: 10px; border: 1px solid #ccc; border-radius: 4px; margin-top: 4px; outline: none; font-size: 14px; }
+        input:focus, select:focus { border-color: #1a237e; }
+        
+        .btn-group { grid-column: span 3; display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+        .btn-action { flex: 1; min-width: 150px; color: white; border: none; padding: 15px; cursor: pointer; font-weight: bold; border-radius: 4px; font-size: 14px; transition: 0.3s; text-align: center; }
+        
+        .btn-save-db { background: #1565c0; color: white; padding: 10px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; grid-column: span 3; font-size: 15px; }
+        .btn-save-db:hover { background: #0d47a1; }
+
+        .btn-download { background: #1a237e; }
+        .btn-whatsapp { background: #25D366; color: #fff; } 
+        .btn-next { background: #e65100; } 
         .btn-clear-img { background: #d32f2f; color: white; border: none; padding: 6px 10px; border-radius: 3px; cursor: pointer; font-size: 11px; margin-top: 5px; }
 
-        /* Mobile Screen Setup */
         @media (max-width: 768px) {
-            .no-print { grid-template-columns: 1fr; }
-            .btn-group { grid-column: span 1; flex-direction: column; }
+            .grid-panel { grid-template-columns: 1fr; }
+            .db-header, .btn-save-db, .btn-group { grid-column: span 1; }
+            .btn-group { flex-direction: column; }
             body { padding: 10px; }
-            .receipt-card { transform: scale(0.95); transform-origin: top center; }
+            .receipt-wrapper { justify-content: flex-start; }
+            .receipt-card { transform: scale(0.95); transform-origin: top left; }
         }
 
         /* Receipt Card Design */
@@ -45,8 +56,12 @@
         .qr-box { width: 80px; height: 80px; margin-left: auto; }
 
         .info-bar { display: flex; justify-content: space-between; margin: 10px 0; font-size: 14px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
-        .info-bar span { white-space: nowrap; } /* Stops year from going down */
-        .info-bar-name { font-size: 16px; margin-bottom: 10px; }
+        .info-bar span { white-space: nowrap; }
+        
+        .info-bar-name { font-size: 15px; margin-bottom: 10px; display: flex; gap: 40px; border: none; }
+        .underline-box { border-bottom: 2px solid #333; display: inline-block; font-weight: bold; color: #1a237e; padding: 0 5px; text-align: center; }
+        .name-box { min-width: 180px; }
+        .class-box { min-width: 80px; }
         
         table.fee-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         .fee-table th { background: #1a237e; color: white; padding: 10px; text-align: left; }
@@ -59,38 +74,52 @@
         .sig-container { text-align: center; width: 180px; }
         .sig-img-box { height: 60px; margin-bottom: 5px; }
         .sig-img-box img { max-height: 100%; }
-
+        
+        @media print { .no-print { display: none !important; } }
     </style>
 </head>
 <body>
 
-<div class="no-print">
-    <div class="input-group">
-        <label>1. Date</label>
-        <input type="date" id="inDate" onchange="draw()">
+<div class="no-print panel db-panel grid-panel">
+    <h3 class="db-header">👨‍🎓 Add Student to Database (One-time Setup)</h3>
+    <div class="input-group"><label>Student Name</label><input type="text" id="dbName" placeholder="Rahul Kumar"></div>
+    <div class="input-group"><label>Class</label><input type="text" id="dbClass" placeholder="10th"></div>
+    <div class="input-group"><label>WhatsApp No.</label><input type="number" id="dbPhone" placeholder="10 Digits"></div>
+    <div class="input-group"><label>Monthly Fee (₹)</label><input type="number" id="dbFee" placeholder="1000"></div>
+    <div class="input-group" style="justify-content: flex-end; color: #1565c0; font-size: 12px;">
+        <span id="dbStatus">Total Saved Students: 0</span>
     </div>
-    <div class="input-group">
-        <label>2. School Logo</label>
-        <input type="file" accept="image/*" onchange="saveImg(event, 'logoImg', 'savedLogo')">
-        <button class="btn-clear-img" onclick="clearImg('logoImg', 'savedLogo')">Remove Logo</button>
-    </div>
-    <div class="input-group">
-        <label>3. Signature</label>
-        <input type="file" accept="image/*" onchange="saveImg(event, 'sigImg', 'savedSig')">
-        <button class="btn-clear-img" onclick="clearImg('sigImg', 'savedSig')">Remove Sig</button>
+    <div class="input-group"></div>
+    <button class="btn-save-db" onclick="saveStudentToDB()">💾 SAVE STUDENT INFO</button>
+</div>
+
+<div class="no-print panel grid-panel">
+    
+    <div class="input-group" style="grid-column: span 3; background: #fff9c4; padding: 10px; border-radius: 5px; border: 1px dashed #fbc02d;">
+        <label style="color: #f57f17; font-size: 15px;">⚡ Auto-Fill: Select Saved Student</label>
+        <select id="selectStudent" onchange="autoFillStudent()">
+            <option value="">-- Naya Bachha Type Karein Ya Select Karein --</option>
+        </select>
     </div>
 
+    <div class="input-group"><label>1. Date</label><input type="date" id="inDate" onchange="draw()"></div>
+    <div class="input-group"><label>2. School Logo</label><input type="file" accept="image/*" onchange="saveImg(event, 'logoImg', 'savedLogo')"><button class="btn-clear-img" onclick="clearImg('logoImg', 'savedLogo')">Remove</button></div>
+    <div class="input-group"><label>3. Signature</label><input type="file" accept="image/*" onchange="saveImg(event, 'sigImg', 'savedSig')"><button class="btn-clear-img" onclick="clearImg('sigImg', 'savedSig')">Remove</button></div>
+
     <div class="input-group"><label>4. Student Name</label><input type="text" id="inName" placeholder="Bachhe ka naam" oninput="draw()"></div>
-    <div class="input-group"><label>5. Months</label><input type="text" id="inMonth" placeholder="Ex: Jan-Feb" oninput="draw()"></div>
-    <div class="input-group"><label>6. Previous Due (₹)</label><input type="number" id="inOld" value="0" oninput="draw()"></div>
+    <div class="input-group"><label>5. Class</label><input type="text" id="inClass" placeholder="Ex: 10th" oninput="draw()"></div>
+    <div class="input-group"><label>6. WhatsApp No.</label><input type="number" id="inPhone" placeholder="10 Digit Number"></div>
     
-    <div class="input-group"><label>7. Current Fee (₹)</label><input type="number" id="inCurrent" value="0" oninput="draw()"></div>
-    <div class="input-group"><label>8. Paid Now (₹)</label><input type="number" id="inPaid" value="0" oninput="draw()"></div>
-    <div class="input-group"></div> 
+    <div class="input-group"><label>7. Fee Month(s)</label><input type="text" id="inMonth" placeholder="Ex: March" oninput="draw()"></div>
+    <div class="input-group"><label>8. Previous Due (₹)</label><input type="number" id="inOld" value="0" oninput="draw()"></div>
+    <div class="input-group"><label>9. Current Fee (₹)</label><input type="number" id="inCurrent" value="0" oninput="draw()"></div>
+    
+    <div class="input-group"><label>10. Paid Now (₹)</label><input type="number" id="inPaid" value="0" oninput="draw()"></div>
     
     <div class="btn-group">
-        <button class="btn-download" onclick="downloadImage()">⬇️ 1. DOWNLOAD AS IMAGE</button>
-        <button class="btn-next" onclick="nextReceipt()">🔄 2. NEXT STUDENT (Clear)</button>
+        <button class="btn-action btn-download" onclick="downloadImage()">⬇️ 1. DOWNLOAD IMG</button>
+        <button class="btn-action btn-whatsapp" onclick="smartSend()">📤 SEND RECEIPT</button>
+        <button class="btn-action btn-next" onclick="nextReceipt()">🔄 3. NEXT STUDENT</button>
     </div>
 </div>
 
@@ -98,17 +127,13 @@
     <div class="receipt-card" id="receipt">
         <table class="header-table">
             <tr>
-                <td style="width: 80px; border:none;">
-                    <div class="logo-box"><img id="logoImg" src="" onerror="this.style.display='none'"></div>
-                </td>
+                <td style="width: 80px; border:none;"><div class="logo-box"><img id="logoImg" src="" onerror="this.style.display='none'"></div></td>
                 <td class="co-name" style="border:none;">
                     <h1>SUPERIOR CLASSES</h1>
                     <p class="slogan">"Expert Coaching for a Better Future"</p>
                     <p class="address">📍 Lal Kothi Road, Katihar | 📞 Mob: 9852192802</p>
                 </td>
-                <td style="width: 80px; border:none;">
-                    <div id="qrcode" class="qr-box"></div>
-                </td>
+                <td style="width: 80px; border:none;"><div id="qrcode" class="qr-box"></div></td>
             </tr>
         </table>
 
@@ -116,16 +141,15 @@
             <span><strong>Receipt No:</strong> <span id="rNo"></span></span>
             <span><strong>Date:</strong> <span id="rDate"></span></span>
         </div>
-        <div class="info-bar info-bar-name" style="border:none;">
-            <span><strong>Student Name:</strong> <span id="rName" style="border-bottom: 2px solid #333; min-width: 250px; display: inline-block; font-weight: bold; color: #1a237e;"></span></span>
+        
+        <div class="info-bar-name">
+            <span><strong>Student Name:</strong> <span id="rName" class="underline-box name-box"></span></span>
+            <span><strong>Class:</strong> <span id="rClass" class="underline-box class-box"></span></span>
         </div>
 
         <table class="fee-table">
             <thead>
-                <tr>
-                    <th style="width: 70%;">PARTICULARS (FEES DESCRIPTION)</th>
-                    <th style="width: 30%;">AMOUNT (₹)</th>
-                </tr>
+                <tr><th style="width: 70%;">PARTICULARS (FEES DESCRIPTION)</th><th style="width: 30%;">AMOUNT (₹)</th></tr>
             </thead>
             <tbody>
                 <tr><td>Monthly Tuition Fee for: <strong id="rMonth">...</strong></td><td id="rCurrent">0.00</td></tr>
@@ -138,10 +162,7 @@
 
         <div class="footer">
             <div style="font-size: 12px; color: #444; line-height: 1.5;">
-                <strong>Note:</strong><br>
-                - Fee once paid is non-refundable.<br>
-                - Balance due must be cleared by next month.<br>
-                - This is a computer generated receipt.
+                <strong>Note:</strong><br>- Fee once paid is non-refundable.<br>- Balance due must be cleared by next month.<br>- This is a computer generated receipt.
             </div>
             <div class="sig-container">
                 <div class="sig-img-box"><img id="sigImg" src="" onerror="this.style.display='none'"></div>
@@ -152,13 +173,79 @@
 </div>
 
 <script>
-    // Set Date & Random Bill Number on load
+    // --- DATABASE LOGIC ---
+    let studentDB = JSON.parse(localStorage.getItem('superior_students_db')) || [];
+
+    function updateStudentDropdown() {
+        const select = document.getElementById('selectStudent');
+        select.innerHTML = '<option value="">-- Naya Bachha Type Karein Ya Select Karein --</option>';
+        
+        studentDB.forEach((student, index) => {
+            let option = document.createElement('option');
+            option.value = index; // Use array index as ID
+            option.text = `${student.name} (Class: ${student.class})`;
+            select.appendChild(option);
+        });
+        
+        document.getElementById('dbStatus').innerText = `Total Saved Students: ${studentDB.length}`;
+    }
+
+    function saveStudentToDB() {
+        let name = document.getElementById('dbName').value.trim();
+        let cls = document.getElementById('dbClass').value.trim();
+        let phone = document.getElementById('dbPhone').value.trim();
+        let fee = document.getElementById('dbFee').value.trim();
+
+        if(!name) { alert("Student ka naam daalna zaroori hai!"); return; }
+
+        let newStudent = { name: name, class: cls, phone: phone, fee: fee };
+        
+        // Check if student already exists, update if true
+        let existingIndex = studentDB.findIndex(s => s.name.toLowerCase() === name.toLowerCase() && s.class === cls);
+        if(existingIndex >= 0) {
+            studentDB[existingIndex] = newStudent;
+            alert("Student ki details update ho gayi!");
+        } else {
+            studentDB.push(newStudent);
+            alert("Naya student database mein save ho gaya!");
+        }
+
+        localStorage.setItem('superior_students_db', JSON.stringify(studentDB));
+        updateStudentDropdown();
+        
+        // Clear DB input fields
+        document.getElementById('dbName').value = "";
+        document.getElementById('dbClass').value = "";
+        document.getElementById('dbPhone').value = "";
+        document.getElementById('dbFee').value = "";
+    }
+
+    function autoFillStudent() {
+        let selectedIndex = document.getElementById('selectStudent').value;
+        if(selectedIndex === "") {
+            // Naya bachha - form clear kar do
+            document.getElementById('inName').value = "";
+            document.getElementById('inClass').value = "";
+            document.getElementById('inPhone').value = "";
+            document.getElementById('inCurrent').value = 0;
+            draw();
+            return;
+        }
+
+        let student = studentDB[selectedIndex];
+        document.getElementById('inName').value = student.name || "";
+        document.getElementById('inClass').value = student.class || "";
+        document.getElementById('inPhone').value = student.phone || "";
+        document.getElementById('inCurrent').value = student.fee || 0;
+        
+        draw(); // Update receipt
+    }
+
+    // --- RECEIPT LOGIC ---
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('inDate').value = today;
     
-    function generateRandomBill() {
-        return "SC/" + new Date().getFullYear() + "/" + Math.floor(1000 + Math.random() * 9000);
-    }
+    function generateRandomBill() { return "SC/" + new Date().getFullYear() + "/" + Math.floor(1000 + Math.random() * 9000); }
     document.getElementById('rNo').innerText = generateRandomBill();
 
     const qrContainer = document.getElementById("qrcode");
@@ -180,15 +267,11 @@
 
     window.onload = function() {
         const savedLogo = localStorage.getItem('savedLogo');
-        if (savedLogo) {
-            document.getElementById('logoImg').src = savedLogo;
-            document.getElementById('logoImg').style.display = 'block';
-        }
+        if (savedLogo) { document.getElementById('logoImg').src = savedLogo; document.getElementById('logoImg').style.display = 'block'; }
         const savedSig = localStorage.getItem('savedSig');
-        if (savedSig) {
-            document.getElementById('sigImg').src = savedSig;
-            document.getElementById('sigImg').style.display = 'block';
-        }
+        if (savedSig) { document.getElementById('sigImg').src = savedSig; document.getElementById('sigImg').style.display = 'block'; }
+        
+        updateStudentDropdown(); // Load DB on start
         setTimeout(() => { draw(); }, 300);
     };
 
@@ -199,7 +282,8 @@
     }
 
     function draw() {
-        const name = document.getElementById('inName').value || "......................";
+        const name = document.getElementById('inName').value || "";
+        const studentClass = document.getElementById('inClass').value || "";
         const month = document.getElementById('inMonth').value || "..........";
         const current = parseFloat(document.getElementById('inCurrent').value) || 0;
         const old = parseFloat(document.getElementById('inOld').value) || 0;
@@ -209,14 +293,13 @@
         if(rawDate) {
             const [y, m, d] = rawDate.split('-');
             document.getElementById('rDate').innerText = `${d}/${m}/${y}`;
-        } else {
-            document.getElementById('rDate').innerText = "DD/MM/YYYY";
-        }
+        } else { document.getElementById('rDate').innerText = "DD/MM/YYYY"; }
 
         const total = current + old;
         const due = total - paid;
 
         document.getElementById('rName').innerText = name;
+        document.getElementById('rClass').innerText = studentClass;
         document.getElementById('rMonth').innerText = month;
         document.getElementById('rCurrent').innerText = current.toFixed(2);
         document.getElementById('rOld').innerText = old.toFixed(2);
@@ -224,41 +307,77 @@
         document.getElementById('rPaid').innerText = paid.toFixed(2);
         document.getElementById('rDue').innerText = due.toFixed(2);
 
-        let qrText = `Superior Classes\nName: ${name}\nTotal: ${total}\nPaid: ${paid}\nDue: ${due}`;
+        let qrText = `Superior Classes\nName: ${name || "N/A"}\nClass: ${studentClass || "N/A"}\nTotal: ${total}\nPaid: ${paid}\nDue: ${due}`;
         qrcode.clear();
         qrcode.makeCode(qrText);
     }
 
-    // High Quality Image Download Logic
     function downloadImage() {
         const receiptCard = document.getElementById('receipt');
-        const studentName = document.getElementById('inName').value || "Student";
-        const billNo = document.getElementById('rNo').innerText.replace(/\//g, '-');
-        
-        // Changing button text to show loading
+        let studentName = document.getElementById('inName').value || "Student";
+        let safeName = studentName.replace(/[^a-zA-Z0-9]/g, '');
+        let finalFileName = `Superior_Classes_${safeName}_Receipt.png`;
+
         const btn = document.querySelector('.btn-download');
         const originalText = btn.innerText;
-        btn.innerText = "⏳ GENERATING IMAGE...";
+        btn.innerText = "⏳ GENERATING...";
         
-        // Scale 3 gives very high resolution
         html2canvas(receiptCard, { scale: 3, backgroundColor: "#ffffff" }).then(canvas => {
             const link = document.createElement('a');
-            link.download = `Superior_Classes_${studentName}_${billNo}.png`;
+            link.download = finalFileName;
             link.href = canvas.toDataURL('image/png');
             link.click();
             btn.innerText = originalText;
         });
     }
+  
+   function smartSend() {
+    let phone = document.getElementById('inPhone').value;
+    let studentName = document.getElementById('inName').value || "Student";
+
+    if (!phone || phone.length < 10) { 
+        alert("Bhai, pehle bachhe ka 10-digit WhatsApp number daaliye!"); 
+        return; 
+    }
+
+    if (phone.length === 10) { 
+        phone = "91" + phone; 
+    }
+
+    const receiptCard = document.getElementById('receipt');
+    let safeName = studentName.replace(/[^a-zA-Z0-9]/g, '');
+    let finalFileName = `Superior_Classes_${safeName}_Receipt.png`;
+
+    const btn = document.querySelector('.btn-whatsapp');
+    const originalText = btn.innerText;
+    btn.innerText = "⏳ PREPARING...";
+
+    html2canvas(receiptCard, { scale: 3, backgroundColor: "#ffffff" }).then(canvas => {
+        // 1️⃣ Auto Download Image
+        const link = document.createElement('a');
+        link.download = finalFileName;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+
+        // 2️⃣ Open WhatsApp (No Text)
+        let waLink = `https://wa.me/${phone}`;
+        window.open(waLink, '_blank');
+
+        btn.innerText = originalText;
+    });
+}
 
     function nextReceipt() {
         document.getElementById('rNo').innerText = generateRandomBill();
         
+        document.getElementById('selectStudent').value = ""; // Reset dropdown
         document.getElementById('inName').value = "";
+        document.getElementById('inClass').value = "";
+        document.getElementById('inPhone').value = "";
         document.getElementById('inMonth').value = "";
         document.getElementById('inCurrent').value = "";
         document.getElementById('inOld').value = "";
         document.getElementById('inPaid').value = "";
-        
         document.getElementById('inDate').value = today;
         
         draw(); 
